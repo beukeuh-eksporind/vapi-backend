@@ -3,75 +3,66 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const app = express();
-const PORT = 3000; // Ganti sesuai kebutuhan, atau pakai process.env.PORT
+const PORT = 3000;
+
+// Middleware untuk parsing JSON
+app.use(express.json());
+
+// Folder untuk data
+const dataPath = path.join(__dirname, 'data');
+const usersFile = path.join(dataPath, 'users.json');
+
+// Endpoint pengecekan server
 app.get('/api/ping', (req, res) => {
   res.json({ message: 'Pong! Server hidup 🎉' });
 });
-app.use(express.json());
 
-// Load data user dari file JSON
-const dataPath = path.join(__dirname, 'data', 'users.json');
-function loadUsers() {
-  if (!fs.existsSync(dataPath)) return {};
-  const raw = fs.readFileSync(dataPath);
-  return JSON.parse(raw);
-}
-
-function saveUsers(users) {
-  fs.writeFileSync(dataPath, JSON.stringify(users, null, 2));
-}
-
-// === Endpoint: Penarikan ===
-app.post('/api/tarik', (req, res) => {
-  const { nama, coin } = req.body;
-  const rate = 10; // Misal 1 coin = Rp10
-  const minimal = 100; // Minimal coin untuk tarik
-
-  if (!nama || typeof coin !== 'number') {
-    return res.status(400).json({ sukses: false, pesan: 'Data tidak lengkap' });
-  }
-
-  if (coin < minimal) {
-    return res.status(403).json({ sukses: false, pesan: 'Koin belum cukup untuk ditarik' });
-  }
-
-  const users = loadUsers();
-  if (!users[nama]) {
-    users[nama] = { totalTarik: 0, riwayat: [] };
-  }
-
-  const jumlahRupiah = coin * rate;
-  const tanggal = new Date().toLocaleString('id-ID');
-
-  // Simpan riwayat
-  users[nama].riwayat.push({ tanggal, jumlah: jumlahRupiah });
-  users[nama].totalTarik += jumlahRupiah;
-
-  saveUsers(users);
-
-  return res.json({
-    sukses: true,
-    pesan: `Penarikan berhasil. Rp${jumlahRupiah.toLocaleString('id-ID')} sedang diproses.`,
-    data: {
-      tanggal,
-      jumlah: jumlahRupiah
-    }
-  });
+// Endpoint ambil semua user
+app.get('/api/users', (req, res) => {
+  const data = fs.readFileSync(usersFile, 'utf-8');
+  res.json(JSON.parse(data));
 });
 
-// === Endpoint: Lihat Riwayat ===
-app.get('/api/riwayat/:nama', (req, res) => {
-  const nama = req.params.nama;
-  const users = loadUsers();
+// Endpoint simpan/update user
+app.post('/api/user', (req, res) => {
+  const { nama, coins, xp, level } = req.body;
 
-  if (!users[nama]) {
-    return res.json({ sukses: true, riwayat: [] });
+  if (!nama) {
+    return res.status(400).json({ error: 'Nama harus disertakan' });
   }
 
-  return res.json({ sukses: true, riwayat: users[nama].riwayat });
+  let users = [];
+  try {
+    users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+  } catch (e) {
+    users = [];
+  }
+
+  const existing = users.find(u => u.nama === nama);
+  if (existing) {
+    existing.coins = coins;
+    existing.xp = xp;
+    existing.level = level;
+  } else {
+    users.push({ nama, coins, xp, level });
+  }
+
+  fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+  res.json({ success: true, message: 'Data disimpan' });
 });
 
-// === Start Server ===
+// Endpoint untuk reset semua user (admin)
+app.post('/api/admin/reset', (req, res) => {
+  const { kode } = req.body;
+  if (kode !== 'vareset2025') {
+    return res.status(403).json({ error: 'Kode admin salah' });
+  }
+
+  fs.writeFileSync(usersFile, '[]');
+  res.json({ success: true, message: 'Semua data pengguna berhasil direset' });
+});
+
+// Jalankan server
 app.listen(PORT, () => {
   console.log(`✅ Server berjalan di http://localhost:${PORT}`);
 });
