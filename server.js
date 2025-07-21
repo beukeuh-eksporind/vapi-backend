@@ -4,7 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 const PORT = 3000; // Ganti sesuai kebutuhan, atau pakai process.env.PORT
-
+app.get('/api/ping', (req, res) => {
+  res.json({ message: 'Pong! Server hidup 🎉' });
+});
 app.use(express.json());
 
 // Load data user dari file JSON
