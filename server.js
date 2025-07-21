@@ -1,68 +1,39 @@
 // server.js
 const express = require('express');
 const fs = require('fs');
-const path = require('path');
 const app = express();
 const PORT = 3000;
 
-// Middleware untuk parsing JSON
+// Middleware
 app.use(express.json());
+app.use(express.static('public')); // folder frontend
+const USERS_PATH = './data/users.json';
 
-// Folder untuk data
-const dataPath = path.join(__dirname, 'data');
-const usersFile = path.join(dataPath, 'users.json');
-
-// Endpoint pengecekan server
-app.get('/api/ping', (req, res) => {
-  res.json({ message: 'Pong! Server hidup 🎉' });
-});
-
-// Endpoint ambil semua user
+// Endpoint: Ambil semua user
 app.get('/api/users', (req, res) => {
-  const data = fs.readFileSync(usersFile, 'utf-8');
-  res.json(JSON.parse(data));
-});
-
-// Endpoint simpan/update user
-app.post('/api/user', (req, res) => {
-  const { nama, coins, xp, level } = req.body;
-
-  if (!nama) {
-    return res.status(400).json({ error: 'Nama harus disertakan' });
-  }
-
-  let users = [];
   try {
-    users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
-  } catch (e) {
-    users = [];
+    const users = JSON.parse(fs.readFileSync(USERS_PATH));
+    res.json(users);
+  } catch (err) {
+    console.error('Gagal baca users:', err);
+    res.status(500).send('Server error');
   }
-
-  const existing = users.find(u => u.nama === nama);
-  if (existing) {
-    existing.coins = coins;
-    existing.xp = xp;
-    existing.level = level;
-  } else {
-    users.push({ nama, coins, xp, level });
-  }
-
-  fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
-  res.json({ success: true, message: 'Data disimpan' });
 });
 
-// Endpoint untuk reset semua user (admin)
-app.post('/api/admin/reset', (req, res) => {
-  const { kode } = req.body;
-  if (kode !== 'vareset2025') {
-    return res.status(403).json({ error: 'Kode admin salah' });
+// Endpoint: Tambah / update user (opsional untuk testing)
+app.post('/api/users', (req, res) => {
+  try {
+    const newUser = req.body;
+    const users = JSON.parse(fs.readFileSync(USERS_PATH));
+    users.push(newUser);
+    fs.writeFileSync(USERS_PATH, JSON.stringify(users, null, 2));
+    res.send('OK');
+  } catch (err) {
+    console.error('Gagal simpan user:', err);
+    res.status(500).send('Gagal simpan');
   }
-
-  fs.writeFileSync(usersFile, '[]');
-  res.json({ success: true, message: 'Semua data pengguna berhasil direset' });
 });
 
-// Jalankan server
 app.listen(PORT, () => {
   console.log(`✅ Server berjalan di http://localhost:${PORT}`);
 });
